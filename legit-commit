@@ -1,0 +1,167 @@
+#!/bin/dash
+
+# This file use the following legit commands:
+#TODO change file name when running autotest
+    # status
+    # add
+
+# Test if no repo
+if [ ! -d '.legit' ]
+then
+    echo "legit-commit: error: no .legit directory containing legit repository exists"
+    exit 1
+fi
+
+
+if [ ! $# -eq 2 ] && [ ! $# -eq 3 ]
+then
+    echo 'usage: legit-commit [-a] -m commit-message'
+    exit 1
+fi
+
+a=0
+m=0
+if [ "$1" = '-a' ] && [ "$#" -eq 3 ]
+then
+    a=1
+elif [ "$1" = '-m' ] && [ "$#" -eq 2 ]
+then
+    m=1
+else
+    echo 'usage: legit-commit [-a] -m commit-message'
+    exit 1
+fi
+
+if [ $# -eq 3 ]
+then
+    mess="$3"
+    if [ "$2" = '-a' ]
+    then
+        echo 'usage: legit-commit [-a] -m commit-message'
+        exit 1
+    elif [ $m -eq 0 ] && [ "$2" = '-m' ]
+    then
+        m=1
+    else
+        echo 'usage: legit-commit [-a] -m commit-message'
+        exit 1
+    fi
+else
+    mess="$2"
+fi
+
+
+
+# Add everything tracked that can be commited
+if [ "$a" = 1 ]
+then
+    # TODO:Change file name when running autotest
+    ./legit-status >".legit/commitstatus" 2>&1
+    while read -r line
+    do
+        name=`echo $line | cut -d' ' -f1`
+        stat=`echo $line | cut -d' ' -f3-`
+        if echo "$stat" | egrep "changes not staged for commit" >/dev/null
+        then
+            ./legit-add "$name"
+        elif echo "$stat" | egrep "different changes staged for commit" >/dev/null
+        then
+            ./legit-add "$name"
+        elif echo "$stat" | egrep "file deleted" >/dev/null
+        then
+            ./legit-add "$name"
+        fi
+        
+    done <'.legit/commitstatus'
+    rm '.legit/commitstatus'
+fi
+
+
+# Check if anything to commit
+./legit-status >".legit/commitstatus" 2>&1
+if [ $? -ne 0 ]
+then
+    rm ".legit/commitstatus"
+    # check if anything in index
+    content=`cat .legit/index`
+    if [ -z "$content"  ]
+    then
+        echo "nothing to commit"
+        exit 0
+    fi    
+else
+    toCommit=0
+    while read -r line
+    do
+        stat=`echo $line | cut -d' ' -f3-`
+        if echo "$stat" | egrep "added to index" >/dev/null
+        then
+            toCommit=1
+            break
+        elif echo "$stat" | egrep "changes staged for commit" >/dev/null
+        then
+            toCommit=1
+            break
+        elif echo "$stat" | egrep "file deleted" >/dev/null
+        then
+            toCommit=1
+            break
+        fi
+    done <'.legit/commitstatus'
+    rm '.legit/commitstatus'
+
+    if [ $toCommit -eq 0 ]
+    then
+        echo "nothing to commit"
+        exit 0
+    fi
+fi
+
+# Update legit-log
+# Add number commit into log with message
+if [ ! -f '.legit/log' ]
+then
+    # start at 0 commit
+    num=0
+    echo "$num $mess" >>'.legit/log'
+else
+    num=`cat '.legit/log' | egrep -o '^[0-9]*' | head -1`
+    num=`expr $num + 1`
+    sed -i "1 i\\$num $mess" '.legit/log'
+fi
+echo "Committed as commit $num"
+
+
+
+# Move everything from index to commit
+touch '.legit/tmpcommit'
+cat '.legit/index' >'.legit/tmpcommit'
+
+# Add parent commit reference hash to commit file
+head=`cat '.legit/HEAD'`
+parent=`cat ".legit/$head"`
+
+# Check for empty head reference
+if [ -z "$parent" ]
+then
+    parent=null
+fi
+
+echo "parent $parent" >> '.legit/tmpcommit'
+
+# Hash commit object
+size=`ls -l ".legit/tmpcommit" | cut -d' ' -f4`
+content=`cat ".legit/tmpcommit"`
+# sha hash
+sha=`echo "commit$size$content" | sha1sum | egrep -o '[^ -]*'`
+
+# Update branch head reference
+echo "$sha" >".legit/$head"
+
+
+# Move commit object location 
+mv ".legit/tmpcommit" ".legit/objects/$sha"
+# Update record of commits with the corresponding hash file
+echo "commit$num $sha" >> '.legit/commit'
+
+exit 0

@@ -1,5 +1,6 @@
 #!/bin/dash
 
+# Implementation for legit-show
 
 if [ ! -d '.legit' ]
 then
@@ -10,7 +11,7 @@ fi
 
 if [ ! -f '.legit/log' ]
 then
-    echo "legit-log: error: your repository does not have any commits     yet"      
+    echo "legit-show: error: your repository does not have any commits yet"      
     exit 1
 fi
 
@@ -33,21 +34,16 @@ filename=`echo "$1" | egrep -o '[^:]*$'`
 # If non-empty commit number
 if [ ! -z "$commit" ]
 then
-    # Try to find commit object in commit record
     comObj=`cat '.legit/commit' | egrep "^commit$commit"`
-    
     # If no matching commit object found, invalid error message
     if [ -z "$comObj" ]
     then
         echo "legit-show: error: unknown commit '$commit'"
         exit 1
     fi
-    
-    folder=`echo "$comObj" | cut -d' ' -f2`
-    file=`echo "$comObj" | cut -d' ' -f3`
-    
+    sha=`echo "$comObj" | cut -d' ' -f2`
     # Try to find filename to show in the commit object
-    fileObj=`egrep " $filename$" ".legit/objects/$folder/$file"`
+    fileObj=`egrep " $filename$" ".legit/objects/$sha"`
 
     if [ -z "$fileObj" ]
     then
@@ -56,9 +52,8 @@ then
     fi
    
     # Try to get the blob object
-    blobDir=`echo "$fileObj" | cut -d' ' -f2`
-    blobName=`echo "$fileObj" | cut -d' ' -f3`
-    cat ".legit/objects/$blobDir/$blobName"
+    blob=`echo "$fileObj" | cut -d' ' -f2`
+    cat ".legit/objects/$blob"
 else
     # If empty commit number input
     # Look for file in index
@@ -71,8 +66,7 @@ else
     fi
     
     # Try to get the blob object
-    blobDir=`echo "$fileObj" | cut -d' ' -f2`
-    blobName=`echo "$fileObj" | cut -d' ' -f3`
-    cat ".legit/objects/$blobDir/$blobName"    
+    blob=`echo "$fileObj" | cut -d' ' -f2`
+    cat ".legit/objects/$blob"    
 fi
-
+exit 0

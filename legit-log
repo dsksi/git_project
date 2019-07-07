@@ -1,0 +1,17 @@
+#!/bin/dash
+
+# Test if no repo
+if [ ! -d '.legit' ]
+then
+    echo "legit-log: error: no .legit directory containing legit repository exists"
+    exit 1
+fi
+
+if [ ! -f '.legit/log' ]
+then
+    echo "legit-log: error: your repository does not have any commits yet"
+    exit 1
+fi
+
+cat '.legit/log'
+exit 0

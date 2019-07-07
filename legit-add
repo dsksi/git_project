@@ -1,0 +1,58 @@
+#!/bin/dash
+
+# Test if repo initiated
+if [ ! -d '.legit' ]
+then
+    echo "legit-add: error: no .legit directory containing legit repository exists"
+    exit 1
+fi
+
+# Test if usage correct
+if [ $# -lt 1 ]
+then
+    echo "usage: legit-add <filenames>"
+    exit 1
+fi
+
+
+for file in $@
+do
+    # Check for invalid filename
+    if echo "$file" | egrep -v "[A-Za-z0-9._-]"
+    then
+        echo "legit-add: error: invalid filename '$file'"
+        exit 1
+    fi
+
+    if [ -d "$file" ]
+    then
+        echo "legit-add: error: '$file' is not a regular file"
+        exit 1
+    fi
+
+    if [ ! -f "$file" ]
+    then
+        # TODO: check if file is just deleted from previous commit
+        echo "legit-add: error: can not open '$file'"
+        exit 1
+    fi
+done
+
+for file in $@
+do
+
+    size=`ls -l "$file" | cut -d' ' -f4`
+    content=`cat "$file"`
+    # sha hash
+    sha=`echo "blob$size$content" | sha1sum | egrep -o '[^ -]*'`
+
+    if [ ! -f ".legit/objects/$sha" ]
+    then
+        cp "$file" ".legit/objects/$sha"
+        egrep -v " $file$" '.legit/index' >'.legit/indextmp'
+        mv '.legit/indextmp' '.legit/index'
+        echo "blob $sha $file" >>'.legit/index'
+        #cat '.legit/index'
+    fi
+done
+exit 0
