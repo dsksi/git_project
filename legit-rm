@@ -2,4 +2,116 @@
 
 # Legit rm implementation
 
+if [ ! -d '.legit' ]
+then
+    echo "legit-rm: error: no .legit directory containing legit repository exists" 1>&2
+    exit 1
+fi
+
+if [ ! -f '.legit/log' ]
+then
+    echo "legit-rm: error: your repository does not have any commits yet" 1>&2
+    exit 1
+fi
+
+if [ $# -eq 0 ]
+then
+    echo "usage: legit-rm [--force] [--cached] <filenames>" 1>&2
+    exit 1
+fi
+
+cached=0
+forced=0
+if [ $1 = '--cached' ]
+then
+    cached=1
+    sta=2
+    if [ $2 = '--force' ]
+    then
+        forced=1
+        sta=3
+    fi
+elif [ $1 = '--force' ]
+then
+    forced=1
+    sta=2
+    if [ $2 = '--cached' ]
+    then
+        cached=1
+        sta=3
+    fi
+else
+    sta=1
+fi
+
+
+if [ ! $# -ge $sta ]
+then
+    echo "usage: legit-rm [--force] [--cached] <filenames>" 1>&2
+    exit 1
+fi
+
+# Check all remaining arguments are valid
+files=`echo $@ | cut -d' ' -f$sta-`
+for arg in $files
+do
+    if ! egrep " $arg$" '.legit/index' >/dev/null
+    then
+        echo "legit-rm: error: '$arg' is not in the legit repository" 1>&2
+        exit 1
+    fi
+done
+
+if [ $forced = '0' ] # && [ $cached = '0' ]
+then
+    # Set path to recent commit of HEAD
+    branch=`cat '.legit/HEAD'`
+    rc=`cat ".legit/$branch"`
+    rcPath="objects/$rc"
+    
+    # check for changes
+    for arg in $files
+    do
+        # Get recent commit sha of this file
+        blobRc=`egrep " $arg$" ".legit/$rcPath"`
+        rcSha=`echo "$blobRc" | cut -d' ' -f2`
+        # Get file sha in index    
+        indexLine=`egrep " $arg$" ".legit/index"`
+        indSha=`echo "$indexLine" | cut -d' ' -f2`
+        if [ -f $arg ]
+        then
+            # if file exist in working directory
+            # Compute working directory file sha hash
+            size=`ls -l "$arg" | cut -d' ' -f4`
+            content=`cat "$arg"`
+            wdSha=`echo "blob$size$content" | sha1sum | egrep -o '[^ -]*'`
+        fi
+        # echo "rc $rcSha"
+        # echo "wd $wdSha"
+        # echo "index $indSha"
+        if [ "$rcSha" != "$indSha" ] && [ "$wdSha" != "$indSha" ]
+        then
+            echo "legit-rm: error: '$arg' in index is different to both working file and repository" 1>&2
+            exit 1
+        elif [ "$rcSha" != "$indSha" ] && [ "$cached" = '0' ]
+        then
+            echo "legit-rm: error: '$arg' has changes staged in the index" 1>&2
+            exit 1
+        elif [ "$wdSha" != "$rcSha" ] && [ "$cached" = '0' ]
+        then
+            echo "legit-rm: error: '$arg' in repository is different to working file" 1>&2
+            exit 1
+        fi
+        
+    done
+fi
+
+for arg in $files
+do
+    sed -i "/ $arg$/d" '.legit/index'
+    if [ $cached = '0' ]
+    then
+        rm "$arg" >/dev/null 2>&1
+    fi
+done
 

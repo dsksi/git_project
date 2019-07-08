@@ -3,14 +3,14 @@
 # Test if repo initiated
 if [ ! -d '.legit' ]
 then
-    echo "legit-add: error: no .legit directory containing legit repository exists"
+    echo "legit-add: error: no .legit directory containing legit repository exists" 1>&2
     exit 1
 fi
 
 # Test if usage correct
 if [ $# -lt 1 ]
 then
-    echo "usage: legit-add <filenames>"
+    echo "usage: legit-add <filenames>" 1>&2
     exit 1
 fi
 
@@ -18,28 +18,38 @@ fi
 for file in $@
 do
     # Check for invalid filename
-    if echo "$file" | egrep -v "[A-Za-z0-9._-]"
+    if echo "$file" | egrep -v "[A-Za-z0-9._-]" >/dev/null
     then
-        echo "legit-add: error: invalid filename '$file'"
+        echo "legit-add: error: invalid filename '$file'" 1>&2
         exit 1
     fi
 
     if [ -d "$file" ]
     then
-        echo "legit-add: error: '$file' is not a regular file"
+        echo "legit-add: error: '$file' is not a regular file" 1>&2
         exit 1
     fi
 
-    if [ ! -f "$file" ]
+    if [ ! -e "$file" ]
     then
         # TODO: check if file is just deleted from previous commit
-        echo "legit-add: error: can not open '$file'"
+        if egrep " $file$" '.legit/index' >/dev/null
+        then
+            continue
+        fi
+        echo "legit-add: error: can not open '$file'" 1>&2
         exit 1
     fi
 done
 
 for file in $@
 do
+    if [ ! -e "$file" ]
+    then
+        # Stage file deletion
+        sed -i "/ $file$/d" '.legit/index'
+        continue
+    fi
 
     size=`ls -l "$file" | cut -d' ' -f4`
     content=`cat "$file"`
@@ -48,11 +58,18 @@ do
 
     if [ ! -f ".legit/objects/$sha" ]
     then
+        # Store file content to objects folder
         cp "$file" ".legit/objects/$sha"
-        egrep -v " $file$" '.legit/index' >'.legit/indextmp'
-        mv '.legit/indextmp' '.legit/index'
+        # Remove previous staging
+        sed -i "/ $file$/d" '.legit/index'
+        # Add file to index staging area
         echo "blob $sha $file" >>'.legit/index'
-        #cat '.legit/index'
+        # cat '.legit/index'
+    elif ! egrep "^blob $sha $file$" '.legit/index' >/dev/null
+    then
+        # Remove previous staging
+        sed -i "/ $file$/d" '.legit/index'
+        echo "blob $sha $file" >>'.legit/index'
     fi
 done
 exit 0

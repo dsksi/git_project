@@ -2,7 +2,7 @@
 
 if test -d '.legit'
 then
-    echo "legit-init: error: .legit already exists"
+    echo "legit-init: error: .legit already exists" 1>&2
     exit 1
 fi
 
