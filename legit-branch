@@ -1,0 +1,80 @@
+#!/usr/bin/perl -w
+
+use File::Copy;
+
+if ( ! -f '.legit/log') {
+    die "legit-branch: error: your repository does not have any commits yet\n";
+}
+
+if (!@ARGV) {
+    # list all branch names in sorted order
+    opendir my $dir, ".legit/branch/";
+    my @files = readdir $dir;
+    @files = sort @files;
+    foreach $file (@files) {
+        next if ($file =~ /^\./);
+        print "$file\n";
+    } 
+    exit 0;
+}
+
+# check for valid arguments
+if (@ARGV > 2) {
+    # args can not be more than 2
+    die "usage: legit-branch [-d] <branch>\n";
+} elsif (@ARGV == 2 && $ARGV[0] ne '-d') {
+    # args can only be 2 if using -d flag
+    die "usage: legit-branch [-d] <branch>\n";
+} elsif ($ARGV[0] eq '-d' && @ARGV != 2) {
+    # args must be 2 if using -d flag
+    die "usage: legit-branch [-d] <branch>\n";
+}
+
+$delete = 0;
+$new = 0;
+
+if (@ARGV == 2) {
+    $bname = $ARGV[1];
+    $delete = 1;
+} else {
+    $bname = $ARGV[0];
+    $new = 1;
+}
+
+# check for invalid branch names
+if ( $bname !~ /[a-zA-Z]/) {
+    die "legit-branch: error: invalid branch name '$bname'\n";
+} elsif ($bname =~ /^-/) {
+    die "usage: legit-branch [-d] <branch>\n";
+}
+
+chomp $bname;
+
+# check if branch exist
+if ( -f ".legit/branch/$bname" ) {
+    # create new branch fails
+    die "legit-branch: error: branch '$bname' already exists\n" if $new;
+} else {
+    # delete non-existent branch fails
+    die "legit-branch: error: branch '$bname' does not exist\n" if $delete;
+}
+
+# create new branch
+if ($new) {
+    open my $HEAD, '<', '.legit/HEAD';
+    my $hbranch = <$HEAD>;
+    chomp $hbranch;
+    copy(".legit/$hbranch", ".legit/branch/$bname");
+    exit 0;
+}
+
+# delete branch
+if ($delete) {
+    if ($bname =~ /^master$/) {
+        die "legit-branch: error: can not delete branch 'master'\n";
+    }
+    unlink ".legit/branch/$bname"; 
+    print "Deleted branch '$bname'\n";
+    exit 0;
+}
+
