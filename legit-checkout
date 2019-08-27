@@ -35,12 +35,12 @@ if ("$currbranch" eq "$bname") {
     die "Already on '$bname'\n";
 }
 
+# Get head commit of current branch
 open $HEAD, '<', ".legit/branch/$currbranch";
 $headcommit = <$HEAD>;
 close $HEAD;
 chomp $headcommit;
 
-# Check if index is different to recent commit
 open $f, '<', ".legit/objects/$headcommit";
 @rcommit = <$f>;
 close $f;
@@ -54,7 +54,6 @@ foreach $line (@rcommit) {
     next if "$type" eq 'parent';
     chomp $name;
     $rcSet{$name} = $hash;
-    print "name = $name, hash = $rcSet{$name}\n";
 }
 
 
@@ -62,7 +61,6 @@ foreach $line (@rcommit) {
 open $f, '<', ".legit/index";
 @index = <$f>;
 close $f;
-print "index\n";
 
 foreach $line (@index) {
     # store all data object hash into hash set
@@ -71,7 +69,6 @@ foreach $line (@index) {
     my ($type, $hash, $name) = split(' ', $line);
     chomp $name;
     $indexSet{$name} = $hash;
-    print "name = $name, hash = $indexSet{$name}\n";
 }
 
 # Get head commit of target branch
@@ -80,13 +77,9 @@ $tcommit = <$HEAD>;
 close $HEAD;
 chomp $tcommit;
 
-
-# Check if target branch commit is different to recent commit
-
 open $f, '<', ".legit/objects/$tcommit";
 @target = <$f>;
 close $f;
-print "target\n";
 
 foreach $line (@target) {
     # skip line recording parent commit file
@@ -97,148 +90,102 @@ foreach $line (@target) {
     next if "$type" eq 'parent';
     chomp $name;
     $targetSet{$name} = $hash;
-    print "name = $name, hash = $targetSet{$name}\n";
 }
 
-
 # Check for checkout errors
-
+# Check if target branch commit is different to recent commit
 while (($fname, $fhash) = each %rcSet) {
-    print "$fname for rc\n";
-    print "$fhash\n";
     if(exists $targetSet{$fname}) {
-        print "target hash: $targetSet{$fname}\n";
         next if ($targetSet{$fname} eq $fhash);
-    } 
+    } else {
+        # file not in target branch
+        if( ! exists $indexSet{$fname} ) {
+            #bugggg TODO
+            # file not in index and working directory is okay
+            next if ( ! -f "$fname");
+            #print "error difference: not in target, but in working directory";
+            #$diff{$fname} = 1;
+            #next;
+        }
+    }
     if(exists $indexSet{$fname}) {
         if($indexSet{$fname} ne $fhash) {
-            print "$fname is different between index and rc\n";
             $diff{$fname} = 1;
         } elsif(compare($fname, ".legit/objects/$fhash") != 0) {
-            print "$fname is different between working and rc\n";
             $diff{$fname} = 1;
         }
+    } else {
+        # unsure TODO : about this part
+        $diff{$fname} = 1;
     }
     # what to do when not in index?
 }
 
 while (($fname, $fhash) = each %targetSet) {
-    if(exists $rcSet{$fname}) {
-        next if ($rcSet{$fname} eq $fhash);
+    next if(exists $rcSet{$fname});
+    if(exists $indexSet{$fname}) {
+        next if($indexSet{$fname} eq $fhash && ! -f $fname);
+        $diff{$fname} = 1;
+        next;
     }
-    if(exists $rcSet{$fname}) {
-        if($rcSet{$fname} ne $index{$fname}) {
-            print "$fname is different between index and rc\n";
-            $diff{$fname} = 1;
-        } elsif(compare($fname, ".legit/objects/$rcSet{$fname}") != 0) {
-            print "$fname is different between working and rc\n";
-            $diff{$fname} = 1;
-        }
+
+    if(-f $fname) {
+        $diff{$fname} = 1;
     }
-    # what to do when not in index?
 }
+
+
 
 # Error detected:
 if (%diff) {
-    print "Error:\n";
+    print "legit-checkout: error: Your changes to the following files would be overwritten by checkout:\n";
     foreach $dfile (keys %diff) {
         print "$dfile\n";
     }
-    die; #check if perl program need error code and if needs to be die ?
+    exit 1;
 }
 
 while (($fname, $fhash) = each %rcSet) {
     if (exists $targetSet{$fname}) {
         # check if target commit file hash is same as recent commit's
         next if ($targetSet{$fname} eq $fhash);
-        print "new copy of $fname";
-        # copy(".legit/objects/$targetSet{$fname}", "$fname");
+        copy(".legit/objects/$targetSet{$fname}", "$fname");
     } else {
         # remove the file if not in target branch commit
-        # unlink $fname;
-        print "delete $fname\n";
+        unlink $fname;
     }
 }
 
-# go through the targetSet to makesure did not iss any new files
-# that do not exist in recent commit
-
 while (($fname, $fhash) = each %targetSet) {
-    next if ( -f "$fname");
+    if (! exists $rcSet{$fname} && ! exists $indexSet{$fname}) {
+        copy(".legit/objects/$fhash", $fname);
+        push(@index, "blob $fhash $fname");
+    }
+    next if (-f "$fname");
     copy(".legit/objects/$fhash", $fname);
-    print "new copy of $fname";
 }
 
-print "update the index to the target version\n";
+# move head to the different branch
+open $f, '>', '.legit/HEAD';
+print $f "branch/$bname";
+close $f;
+
 foreach $line (@index) {
     my ($type, $hash, $name) = split(' ', $line);
     chomp $name;
     if (exists $targetSet{$name}) {
-        next if ($targetSet{$name} eq $rcSet{$name});
+        next if (exists $rcSet{$name} && $targetSet{$name} eq $rcSet{$name});
         $hash = $targetSet{$name};
-        print "name = $name, hash = $hash\n";
+        $line = $type.' '.$hash.' '.$name;
     }
 }
 
-
-=for comment
-Go through rc  list of files
-- If exist in larget and hash is same don’t do anything
-- If do not exist in target, rm the file
-- If exist but different hash
-    - Copy the target file over
-
-# checkout leaves the untracked files alone
-# if untracked in previous commit
-    # not necessarily
-    # if --cached deleted
-        # need warning
-# files to give error warning for:
-    # file changed, changes not staged for commit
-    # file changed, changes staged for commit
-    # file deleted, different changes staged for commit
-
-
-
-# checking out
-# delete all the files in the branch head commit object
-# add back all the files in the new branch head commit object
-if ($ARGV[0] eq "load") {
-    die "Usage: $0 load <number>\n" if @ARGV != 2;
-    die "Can not access snaphsot $ARGV[1]: $!\n" if (! -d ".snapshot.$ARGV[1]");
-} elsif ($ARGV[0] eq "save") {
-    die "Usage: $0 save\n" if @ARGV != 1;
-} else {
-    die "Usage: $0 [load|save]\n";
+open $f, '>', '.legit/index';
+foreach $line (@index) {
+    chomp $line;
+    print $f "$line\n";
 }
+close $f;
 
-$backup = 0;
-while ( -d ".snapshot.$backup") {
-    $backup = $backup + 1;
-}
-
-mkdir ".snapshot.$backup";
-print "Creating snapshot $backup\n";
-# save the snapshot
-@files = <*>;
-
-foreach $file (@files) {
-    next if ("$file" =~ /^\./ || "$file" eq "snapshot.pl" );
-    copy("$file", ".snapshot.$backup/$file");
-}
-
-# load the snapshot
-if ($ARGV[0] eq "load") {
-    @files = <*>;
-
-    foreach $file (@files) {
-        next if ("$file" =~ /^\./ || "$file" eq "snapshot.pl" );
-        unlink "$file";
-    }
-    
-    @snapfiles = <".snapshot.$ARGV[1]/*">;
-    for $save (@snapfiles) {
-        $name = basename($save);
-        copy("$save", "$name");
-    }
-    print "Restoring snapshot $ARGV[1]\n";
+print "Switched to branch '$bname'\n";
+exit 0;

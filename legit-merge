@@ -1,0 +1,146 @@
+#!/usr/bin/perl -w
+
+use File::Copy;
+
+if (! -d '.legit' ) {
+    die "legit-merge: error: no .legit directory containing legit repository exists\n"
+}
+
+if (! -f '.legit/log') {
+    die "legit-merge: error: your repository does not have any commits yet\n";
+}
+
+if (@ARGV == 1) {
+    if ($ARGV[0] =~ /\W/) {
+        die "usage: legit-merge <branch|commit> -m message\n";
+    }
+    die "legit-merge: error: empty commit message\n";
+}
+
+if (@ARGV != 3) {
+    die "usage: legit-merge <branch|commit> -m message\n";
+}
+
+$brcom = $ARGV[0];
+$flag = $ARGV[1];
+#$mess = $ARGV[2];
+
+if ($flag ne '-m') {
+    die "usage: legit-merge <branch|commit> -m message\n";
+}
+
+open my $HEAD, '<', ".legit/HEAD";
+my $head = <$HEAD>;
+chomp $head;
+close $HEAD;
+
+open $F, '<', ".legit/$head";
+$headcom = <$F>;
+chomp $headcom;
+close $F;
+
+if ($brcom =~ /\D/) {
+    # merging to a branch
+    $branch = $brcom;
+    chomp $branch;
+    if ( ! -f ".legit/branch/$branch") {
+        die "legit-merge: error: unknown branch '$branch'\n";
+    }
+    if ($head =~ /^$branch$/) {
+        print "Already up to date\n";
+        exit 0;
+    }
+
+    open my $F, '<', ".legit/branch/$branch";
+    my $line = <$F>;
+    chomp $line;
+    $hash = $line;
+} else {
+    # merging to a commit
+    $commit = $brcom;
+    chomp $commit;    
+    # check if valid commit
+    open my $F, '<', '.legit/commit';
+    my @commits = <$F>;
+    close $F;
+    if ($commits[0] =~ /^commit(\d+) (.*)/) {
+        $rc = $1;
+        $hash = $2;
+    }
+    if (!$commit <= $rc) {
+        die "legit-merge: error: unknown commit '$commit'\n";
+    }
+    foreach $c (@commits) {
+        if ($c =~ /^commit(\d+) $headcom/) {
+            $hc = $1; 
+            last;
+        }
+    }
+    if ($hc == $commit) {
+        print "Already up to date\n";
+        exit 0;
+    }
+}
+
+$parent = $hash;
+%tancestor = ();
+while ($parent ne "null") {
+    open my $C, '<', ".legit/objects/$parent";
+    @rcommit = <$C>;
+    close $C;
+    $parent = $rcommit[$#rcommit];
+    chomp $parent;
+    if ($parent =~ /^parent (.*)/ ) {
+        $parent = $1;
+    }
+    $tancestor{$parent} = 1;
+}
+
+if (exists $tancestor{$headcom}) {
+    print "Fast-forward: no commit created\n";
+    # get all file hashes from target merge branch
+    open my $TARGET, '<', ".legit/objects/$hash";
+    my @blobs = <$TARGET>;
+    close $TARGET;
+
+    %targetSet = ();
+    foreach $blob (@blobs) {
+        my ($ftype, $fhash, $fname) = split(' ', $blob);
+        next if "$ftype" eq 'parent';
+        chomp $fname;
+        $targetSet{$fname} = $fhash;
+    }
+
+    # update index
+    open my $INDEX, '<', '.legit/index';
+    @index = <$INDEX>;
+    close $INDEX;
+    foreach $line (@index) {
+        my ($ftype, $fhash, $fname) = split(' ', $line);
+        chomp $fname;
+        if (exists $targetSet{$fname}) {
+            next if ($targetSet{$fname} eq $fhash );
+            copy(".legit/objects/$targetSet{$fname}", "$fname");
+            $fhash = $targetSet{$fname};
+            $line = $ftype.' '.$fhash.' '.$fname;
+        }
+    }
+
+    while (($fname, $fhash) = each %targetSet) {
+        next if (-f $fname);
+        copy(".legit/objects/$fhash", "$fname");
+        push @index, "blob $fhash $fname";
+    }
+
+    open $f, '>', '.legit/index';
+    foreach $line (@index) {
+        chomp $line;
+        next if $line eq "";
+        print $f "$line\n";
+    }
+    close $f;
+} else {
+    print "Already up to date\n";
+}
+
+exit 0;

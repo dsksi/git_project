@@ -1,9 +1,29 @@
 #!/bin/dash
+echo
+echo Test 4: Testing legit-rm
+echo
+# Test rm implementation
+./legit-init
+./legit-rm hello
+echo 1 >a
+./legit-add a
+./legit-commit -m "Add a"
+echo 2 >b
+./legit-rm
+echo "Expected :usage: legit-rm [--force] [--cached] <filenames>"
+./legit-rm b
+echo "Expected: legit-rm: error: 'b' is not in the legit repository"
+./legit-rm a
+
+./legit-commit "delete a"
+echo "Expected: usage: legit-commit [-a] -m commit-message"
+./legit-commit -m  "delete a"
+
+rm -rf .legit
 
 echo
-echo Test file 4:
-echo Test legit commands: init, add, commit, log, show
-echo Test Situation: Repo initiated, no commits made
+echo Test legit commands: add, commit, rm
+echo Test Situation: Repo initiated, commiting and removing files
 echo
 # Ensure current directory only have legit files and this test file
 
@@ -12,71 +32,107 @@ then
     rm -rf '.legit'
 fi
 
+if [ -d 'output' ]
+then
+    rm -rf 'output'
+fi
+
+if [ -d 'expected' ]
+then
+    rm -rf 'expected'
+fi
+
 mkdir output
 mkdir expected
 
 echo './legit-init'
 ./legit-init
-echo "Line a1" >a
-echo "Line b1" >b
-echo "Line c1" >c
+echo "1" >a
+echo "2" >b
 
-echo './legit-add a'
-./legit-add a
+echo './legit-add a b'
+mess=`./legit-add a b`
+if [ ! -z "$mess" ]
+then
+    echo Error: should be no output for add
+fi
+cp a 'expected/a0'
 
-echo Commit 0:
-echo './legit-commit -a -m "Add a"'
-./legit-commit -a -m "Add a"
+echo './legit-commit -m "1st commit"'
+mess=`./legit-commit -m "1st commit"`
+if [ "$mess" != "Committed as commit 0" ]
+then
+    echo Error commiting: "$mess"
+    exit 1
+fi
 
-echo './legit-status'
+echo "3" >c
+echo "4" >d
+echo './legit-add c d'
+mess=`./legit-add c d`
+if [ ! -z "$mess" ]
+then
+    echo Error: should be no output for add
+fi
+echo
+echo './legit-rm --cached a c'
+./legit-rm --cached a c
+
+echo
+echo './legit-commit -m "2nd commit"'
+mess=`./legit-commit -m "2nd commit"`
+if [ ! "$mess" = "Committed as commit 1" ]
+then
+    echo Incorrect output: "$mess"
+fi
+
+echo
+echo check status:
 ./legit-status
 
-echo Commit 1:
-echo "Line a2" >>a
-echo '.legit-commit -a -m "Update a2"'
-./legit-commit -a -m "Update a2"
+echo
+echo "Expected status:
 
-echo Commit 2:
-echo "Line a3" >>a
-echo '.legit-commit -a -m "Update a3"'
-./legit-commit -a -m "Update a3"
+a - untracked
+b - same as repo
+c - untracked
+d - same as repo
+Everything else should be untracked
+"
 
-echo Commit 3:
-echo "Line a4" >>a
-echo '.legit-commit -a -m "Update a4"'
-./legit-commit -a -m "Update a4"
+echo './legit-show 0:a'
+./legit-show 0:a >'output/a0'
+if ! diff 'output/a0' 'expected/a0'
+then
+    echo expected:
+    cat 'expected/a0'
+    echo
+    echo actual:
+    cat 'output/a0'
+    exit 1 
+fi
 
+echo './legit-show 1:a'
+mess=`./legit-show 1:a`
+if [ ! "$mess" = "legit-show: error: 'a' not found in commit 1" ]
+then
+    echo Fail: Incorrect error message
+    echo "$mess"
+fi
 
-echo Commit 4:
-echo "Line a5" >>a
-echo '.legit-commit -a -m "Update a5"'
-./legit-commit -a -m "Update a5"
+echo './legit-show :a'
+mess=`./legit-show :a`
+if [ ! "$mess" = "legit-show: error: 'a' not found in index" ]
+then
+    echo Fail: Incorrect error message
+    echo "$mess"
+fi
 
-echo Commit 5:
-echo "Line a6" >>a
-echo '.legit-commit -a -m "Update a6"'
-./legit-commit -a -m "Update a6"
-
-echo Commit 6:
-echo "Line b2" >>b
-echo '.legit-commit -a -m "Update b2"'
-echo "Expecting nothing to commit"
-./legit-commit -a -m "Update b2"
-
-echo './legit-add b'
-./legit-add b
-echo './legit-commit -a -m "Update b2"'
-./legit-commit -a -m "Update b2"
 
 
 cat >>'expected/log' <<eof
-6 Update b2
-5 Update a6
-4 Update a5
-3 Update a4
-2 Update a3
-1 Update a2
-0 Add a
+1 2nd commit
+0 1st commit
 eof
 
 ./legit-log >'output/log' 
@@ -89,9 +145,6 @@ then
     echo actual:
     cat 'output/log'
 fi
-
-echo "Check legit-status"
-./legit-status 
 
 # Cleanup
 rm -rf .legit

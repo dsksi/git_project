@@ -1,385 +1,99 @@
 #!/bin/dash
 
 echo
-echo Test file 3:
+echo Test file 4:
 echo Test legit commands: init, add, commit, log, show
 echo Test Situation: Repo initiated, no commits made
 echo
 # Ensure current directory only have legit files and this test file
 
-# Case 1:
-echo Test fail: existing .legit directory
-if ! mkdir '.legit' >/dev/null 2>&1
+if [ -d '.legit' ]
 then
-    echo Error: Test failed!
-    echo Please ensure current directory only have legit files and test files 
-    exit 1
+    rm -rf '.legit'
 fi
 
-# Case 2:
-echo
-echo Test success: legit-init
-rm -rf .legit
-mess=`./legit-init`
-estat=$?
-if test "$mess" = "Initialized empty legit repository in .legit"
+mkdir output
+mkdir expected
+
+echo './legit-init'
+./legit-init
+echo "Line a1" >a
+echo "Line b1" >b
+echo "Line c1" >c
+
+echo './legit-add a'
+./legit-add a
+
+echo Commit 0:
+echo './legit-commit -a -m "Add a"'
+./legit-commit -a -m "Add a"
+
+echo './legit-status'
+./legit-status
+
+echo Commit 1:
+echo "Line a2" >>a
+echo '.legit-commit -a -m "Update a2"'
+./legit-commit -a -m "Update a2"
+
+echo Commit 2:
+echo "Line a3" >>a
+echo '.legit-commit -a -m "Update a3"'
+./legit-commit -a -m "Update a3"
+
+echo Commit 3:
+echo "Line a4" >>a
+echo '.legit-commit -a -m "Update a4"'
+./legit-commit -a -m "Update a4"
+
+
+echo Commit 4:
+echo "Line a5" >>a
+echo '.legit-commit -a -m "Update a5"'
+./legit-commit -a -m "Update a5"
+
+echo Commit 5:
+echo "Line a6" >>a
+echo '.legit-commit -a -m "Update a6"'
+./legit-commit -a -m "Update a6"
+
+echo Commit 6:
+echo "Line b2" >>b
+echo '.legit-commit -a -m "Update b2"'
+echo "Expecting nothing to commit"
+./legit-commit -a -m "Update b2"
+
+echo './legit-add b'
+./legit-add b
+echo './legit-commit -a -m "Update b2"'
+./legit-commit -a -m "Update b2"
+
+
+cat >>'expected/log' <<eof
+6 Update b2
+5 Update a6
+4 Update a5
+3 Update a4
+2 Update a3
+1 Update a2
+0 Add a
+eof
+
+./legit-log >'output/log' 
+echo Difference for log output:
+if ! diff 'output/log' 'expected/log'
 then
-    echo Success: correct output
-else
-    echo Fail: incorrect output
-    echo "$mess"
+    echo expected:
+    cat 'expected/log'
+    echo
+    echo actual:
+    cat 'output/log'
 fi
 
-if [ $estat -eq 0 ]
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect exit status \($estat\)
-fi
-
-# Case 3:
-echo
-echo Test fail: add with no argument
-mess=`./legit-add`
-estat=$?
-if test "$mess" = "usage: legit-add <filenames>"
-then
-    echo Success: correct error message
-else
-    echo Fail: incorrect error message
-    echo "$mess"
-fi
-
-if [ $estat -eq 1 ]
-then
-    echo Success: correct exit status 1
-else
-    echo Fail: incorrect error status \($estat\)
-fi
-
-# Make test files
-echo "Line 1" >a
-echo "Line 1" >b
-echo "Line 1" >c
-# Case 4:
-echo
-echo Test success: commit with one argument
-mess=`./legit-add a`
-estat=$?
-if test -z "$mess"
-then
-    echo Success: no output message
-else
-    echo Fail: incorrect output message
-    echo "$mess"
-fi
-
-if [ $estat -eq 0 ]
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect error status \($estat\)
-fi
-
-# Case 5:
-echo
-echo Test success: commit with one added valid argument
-mess=`./legit-add a`
-estat=$?
-if test -z "$mess"
-then
-    echo Success: no output message
-else
-    echo Fail: incorrect output message
-    echo "$mess"
-fi
-
-if [ $estat -eq 0 ]
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect error status \($estat\)
-fi
-
-# Case 6:
-echo
-echo Test fail: commit with one non-existent file arg
-mess=`./legit-add abc`
-estat=$?
-if test "$mess" = "legit-add: error: can not open 'abc'"
-then
-    echo Success: correct error message
-else
-    echo Fail: incorrect error message
-    echo "$mess"
-fi
-
-if [ $estat -eq 1 ]
-then
-    echo Success: correct exit status 1
-else
-    echo Fail: incorrect error status \($estat\)
-fi
-
-# Case 7:
-echo
-echo Test fail: commit with one non-existent file arg, and one existing
-mess=`./legit-add b abc`
-estat=$?
-if test "$mess" = "legit-add: error: can not open 'abc'"
-then
-    echo Success: correct error message
-else
-    echo Fail: incorrect error message
-    echo "$mess"
-fi
-
-if [ $estat -eq 1 ]
-then
-    echo Success: correct exit status 1
-else
-    echo Fail: incorrect error status \($estat\)
-fi
-
-# Case 8:
-echo
-echo Test fail: add with one invalid filename arg
-mess=`./legit-add "h/l"`
-estat=$?
-if test "$mess" = "legit-add: error: invalid filename 'h/l'"
-then
-    echo Success: correct error message
-else
-    echo Fail: incorrect error message
-    echo "$mess"
-fi
-
-if [ $estat -eq 1 ]
-then
-    echo Success: correct exit status 1
-else
-    echo Fail: incorrect error status \($estat\)
-fi
-
-# Case 9:
-echo
-echo Test fail: add with one invalid filename arg
-mess=`./legit-add "h$"`
-estat=$?
-if test "$mess" = "legit-add: error: invalid filename 'h$'"
-then
-    echo Success: correct error message
-else
-    echo Fail: incorrect error message
-    echo "$mess"
-fi
-
-if [ $estat -eq 1 ]
-then
-    echo Success: correct exit status 1
-else
-    echo Fail: incorrect error status \($estat\)
-fi
-
-# Case 10:
-echo
-echo Test fail: commit with folder name as arg
-mkdir "folder" >/dev/null 2>&1
-mess=`./legit-add "folder"`
-estat=$?
-if test "$mess" = "legit-add: error: 'folder' is not a regular file"
-then
-    echo Success: correct error message
-else
-    echo Fail: incorrect output message
-    echo "$mess"
-fi
-
-if [ $estat -eq 1 ]
-then
-    echo Success: correct exit status 1
-else
-    echo Fail: incorrect error status \($estat\)
-fi
-
-# Case 11:
-echo
-echo Test success: make first commit
-mess=`./legit-commit -m "Add only a"`
-estat=$?
-if test "$mess" = "Committed as commit 0"
-then
-    echo Success: correct output message
-else
-    echo Fail: incorrect output message
-    echo "$mess"
-fi
-
-if [ $estat -eq 0 ]
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect error status \($estat\)
-fi
-
-# Case 12:
-mess=`./legit-status`
-echo 
-echo Test status update
-echo "$mess"
-if ! echo "$mess" | egrep "a - same as repo" >/dev/null
-then
-    echo Incorrect status
-elif ! echo "$mess" | egrep "b - untracked" >/dev/null
-then
-    echo Incorrect status
-elif ! echo "$mess" | egrep "c - untracked" >/dev/null
-then
-    echo Incorrect status
-elif echo "$mess" | egrep "folder" >/dev/null
-then
-    echo Incorrect status: should not include folder
-else
-    echo Success
-    echo Instruction: also check everything beside file a is untracked
-fi
-
-# Case 13:
-mess=`./legit-show 0:a`
-estat=$?
-echo
-echo Test succes: show content of a
-if test "$mess" = 'Line 1'
-then
-    echo Success: correct content of a
-else
-    echo Fail: incorrect output of a
-fi
-
-if test $estat -eq 0
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect exit status \($estat\)
-fi
-
-# Case 14:
-mess=`./legit-show 1:a`
-estat=$?
-echo
-echo Test fail: show content of a with incorrect commit
-if test "$mess" = "legit-show: error: unknown commit '1'"
-then
-    echo Success: correct error output
-else
-    echo Fail: incorrect error output
-fi
-
-if test "$estat" -eq 1
-then
-    echo Success: correct exit status 1
-else
-    echo Fail: incorrect exit status \($estat\)
-fi
-
-# Case 15:
-mess=`./legit-show :a`
-estat=$?
-echo
-echo Test succes: show content of a in index
-if test "$mess" = 'Line 1'
-then
-    echo Success: correct content of a in index
-else
-    echo Fail: incorrect output of a
-fi
-
-if test $estat -eq 0
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect exit status \($estat\)
-fi
-
-# Case 15:
-echo 'Line 2' >>a
-mess=`./legit-show :a`
-estat=$?
-echo
-echo Test succes: show content of a in index
-if ! test "$mess" | egrep "Line 2" >/dev/null
-then
-    echo Success: correct content of a in index
-else
-    echo Fail: incorrect output of a
-fi
-
-if test $estat -eq 0
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect exit status \($estat\)
-fi
-
-# Case 16:
-echo
-echo Test success: commit -a flag
-mess=`./legit-commit -a -m "Update a"`
-estat=$?
-if test "$mess" = "Committed as commit 1"
-then
-    echo Success: correct output
-else
-    echo Fail: incorrect output
-    echo "$mess"
-fi
-
-if test $estat -eq 0
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect exit status \($estat\)
-fi
-
-# Case 17:
-mess=`./legit-show 1:a`
-estat=$?
-echo
-echo Test succes: show content of a in commit 1
-if echo "$mess" | egrep 'Line 2' >/dev/null
-then
-    echo Success: correct content of a 
-else
-    echo Fail: incorrect output of a
-    echo "$mess"
-fi
-
-if test $estat -eq 0
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect exit status \($estat\)
-fi
-
-# Case 18:
-mess=`./legit-show 1:a`
-estat=$?
-echo
-echo Test succes: show content of a in index
-if echo "$mess" | egrep 'Line 2' >/dev/null
-then
-    echo Success: correct content of a 
-else
-    echo Fail: incorrect output of a
-    echo "$mess"
-fi
-
-if test $estat -eq 0
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect exit status \($estat\)
-fi
+echo "Check legit-status"
+./legit-status 
 
 # Cleanup
 rm -rf .legit
+rm -rf output
+rm -rf expected

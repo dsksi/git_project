@@ -1,64 +1,28 @@
 #!/bin/dash
 
 echo
-echo Test file 1:
+echo Test file 0:
 echo Test legit commands: init, add, commit, log, show
-echo Test Situation: Repo initiated, no commits made
+echo Test situation: no repo initiated
 echo
 # Ensure current directory only have legit files and this test file
-
-# Case 1:
+echo Setup 1:
 echo Test fail: existing .legit directory
-if ! mkdir '.legit' >/dev/null 2>&1
+if [ -d '.legit' ]
 then
     echo Error: Test failed!
-    echo Please ensure current directory only have legit files and test files 
+    echo Please ensure current directory have no .legit repo initiated
     exit 1
-fi
-mess=`./legit-init`
-estat=$?
-if test "$mess" = "legit-init: error: .legit already exists"
-then
-    echo Success: correct error message
 else
-    echo Fail: incorrect error message
-    echo "$mess"
-fi
-
-if [ $estat -eq 1 ]
-then
-    echo Success: correct exit status 1
-else
-    echo Fail: incorrect error status \($estat\)
+    echo Success: No .legit repo initiated
 fi
 
 # Case 2:
 echo
-echo Test success: legit-init
-rm -rf .legit
-mess=`./legit-init`
-estat=$?
-if test "$mess" = "Initialized empty legit repository in .legit"
-then
-    echo Success: correct output
-else
-    echo Fail: incorrect output
-    echo "$mess"
-fi
-
-if [ $estat -eq 0 ]
-then
-    echo Success: correct exit status 0
-else
-    echo Fail: incorrect exit status \($estat\)
-fi
-
-# Case 3:
-echo
-echo Test fail: add with no argument
+echo Test fail: add with no repo
 mess=`./legit-add`
 estat=$?
-if test "$mess" = "usage: legit-add <filenames>"
+if test "$mess" = "legit-add: error: no .legit directory containing legit repository exists"
 then
     echo Success: correct error message
 else
@@ -75,10 +39,10 @@ fi
 
 # Case 4:
 echo
-echo Test fail: commit with no argument
+echo Test fail: commit with no repo
 mess=`./legit-commit`
 estat=$?
-if test "$mess" = "usage: legit-commit [-a] -m commit-message"
+if test "$mess" = "legit-commit: error: no .legit directory containing legit repository exists"
 then
     echo Success: correct error message
 else
@@ -95,10 +59,10 @@ fi
 
 # Case 5:
 echo
-echo Test fail: log with no commit
+echo Test fail: log with no repo
 mess=`./legit-log`
 estat=$?
-if test "$mess" = "legit-log: error: your repository does not have any commits yet"
+if test "$mess" = "legit-log: error: no .legit directory containing legit repository exists"
 then
     echo Success: correct error message
 else
@@ -115,10 +79,10 @@ fi
 
 # Case 6:
 echo
-echo Test fail: show with no commit
+echo Test fail: show with no repo
 mess=`./legit-show`
 estat=$?
-if test "$mess" = "legit-show: error: your repository does not have any commits yet"
+if test "$mess" = "legit-show: error: no .legit directory containing legit repository exists"
 then
     echo Success: correct error message
 else

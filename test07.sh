@@ -1,78 +1,118 @@
 #!/bin/dash
-
 echo
-echo Test file 7:
-echo Test legit commands: add, commit, rm
-echo Test Situation: Repo initiated, commiting and removing files
+echo Test file 7
+echo Test commands: branch, checkout
 echo
-# Ensure current directory only have legit files and this test file
 
-if [ -d '.legit' ]
-then
-  rm -rf '.legit'
-fi
-
-if [ ! -d 'output' ]
-then
-    mkdir output
-fi
-
-if [ ! -d 'expected' ]
-then
-    mkdir expected
-fi
-
+./legit-branch
+./legit-branch a
+./legit-checkout
+./legit-checkout master
 
 ./legit-init
 echo 1 >a
 echo 2 >b
 echo 3 >c
-./legit-add a b c
-./legit-commit -m "first commit"
-./legit-status >expected/status7cm
-echo 4 >>a
-echo 5 >>b
-echo 6 >>c
-echo 7 >d
-echo 8 >e
-./legit-status >output/status7pre
-./legit-add b c d
-./legit-status >output/status7add
-echo 9 >b
-./legit-rm a
-./legit-rm b                                                 
-./legit-rm c
-./legit-rm d
-./legit-rm e
-./legit-status >output/status7rm
-./legit-rm --cached a
-./legit-rm --cached b
-./legit-rm --cached c
+echo 44 >d
+./legit-add a b c d
+./legit-commit -m "Add a b c"
+./legit-branch feature
+./legit-status | egrep "^[abc] "
+# currently all files are same in both branches
+echo 1a >>a
+# a: wd diff to rc
+
+# file b 
+echo 1b >>b
+./legit-add b
+# b: wd & index are diff to rc
+
+# file c
+rm c
+# c: file deleted but not staged
+
+echo Checkout attempt 1:
+./legit-checkout feature
+if test $? == 0
+then
+    echo Succeeds
+fi
+
+./legit-status | egrep "^[abc] "
+
+echo 4 >d
+./legit-add d
+./legit-commit -m "Add d and commit b change"
+
+./legit-status | egrep "^[abcd] "
+# d : exist in currbranch commit, not in target branch commit
+
+echo 4d >>d
+# d : target branch commit diff to working directory
+
+echo Checkout attempt 2:
+./legit-checkout master
+
+./legit-add d
+echo Checkout attempt 3:
+./legit-checkout master
+
 ./legit-rm --cached d
-./legit-rm --cached e
-./legit-rm --force a
-./legit-rm --force b
-./legit-rm --force c
-./legit-rm --force d
-./legit-rm --force e
-./legit-status >output/status7final
-./legit-log >output/log7final
+echo Checkout attempt 4:
+./legit-checkout master
 
-for file in output/*
-do
-    if echo "$file" | egrep "status" >/dev/null
-    then
-        egrep "^[abcde] " "$file" >output/tmp
-        mv 'output/tmp' "$file"
-    fi
-done
+rm d
+echo Checkout attempt 5:
+./legit-checkout master
 
-for file in output/*
-do
-    echo Difference for: $name
-    name=`basename "$file"`
-    diff "expected/$name" "output/$name"
-done
+./legit-checkout feature
 
-# Cleanup
+if test -f d
+then
+    echo d is back!
+fi
+
+echo
+echo
+# b is different to target branch
+
+echo 2b>>b
+echo Checkout attempt 6:
+./legit-checkout feature
+# b at index is diff to working directory
+
+./legit-add b
+echo Checkout attempt 7:
+./legit-checkout feature
+# b at index is diff to rc
+
+./legit-commit -m "update b"
+echo Checkout attempt 8:
+./legit-checkout feature
+
+rm a b
 rm -rf .legit
+
+echo
+echo
+echo Next Test Scenario
+echo Test deleting unmerged branches
+echo
+
+./legit-init
+echo hey >a
+./legit-add a
+./legit-commit -m "Add a"
+./legit-branch feature1
+./legit-checkout feature1
+
+echo hi >b
+./legit-add b
+./legit-commit -m "Add b"
+
+./legit-checkout master
+
+# testing deleting branch
+./legit-branch -d feature1
+# Detect unmerged changes
+

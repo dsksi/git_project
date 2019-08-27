@@ -2,6 +2,9 @@
 
 use File::Copy;
 
+if (! -d ".legit") {
+    die "legit-branch: error: no .legit directory containing legit repository exists\n"
+}
 if ( ! -f '.legit/log') {
     die "legit-branch: error: your repository does not have any commits yet\n";
 }
@@ -73,6 +76,53 @@ if ($delete) {
     if ($bname =~ /^master$/) {
         die "legit-branch: error: can not delete branch 'master'\n";
     }
+
+    # Detect unmerged work error
+    open my $F, '<', ".legit/branch/$bname";
+    $bcommit = <$F>;
+    close $F;
+    chomp $bcommit;
+    
+    # Get all file hashes from branch to be deleted 
+    open $F, '<', ".legit/objects/$bcommit";
+    @items = <$F>;
+    close $F;
+
+    %blobs = ();
+    foreach $line (@items) {
+        my ($type, $hash, $name) = split(' ', $line);
+        next if "$type" eq 'parent';
+        chomp $name;
+        $blobs{$name} = $hash;
+    }
+
+    # Get all file hashes from master branch
+    open $F, '<', ".legit/branch/master";
+    $mcommit = <$F>;
+    close $F;
+    chomp $mcommit;
+    
+    # Get all file hashes from branch to be deleted 
+    open $F, '<', ".legit/objects/$mcommit";
+    @items = <$F>;
+    close $F;
+    %mblobs = ();
+    foreach $line (@items) {
+        my ($type, $hash, $name) = split(' ', $line);
+        next if "$type" eq 'parent';
+        chomp $name;
+        $mblobs{$name} = $hash;
+    }
+    
+    while(($fname, $fhash) = each %blobs) {
+        # if any to be deleted file is not in master, error
+        if (exists $mblobs{$fname} && $mblobs{$fname} eq $fhash) {
+            next;
+        } else {
+            die "legit-branch: error: branch '$bname' has unmerged changes\n"
+        }
+    }
+
     unlink ".legit/branch/$bname"; 
     print "Deleted branch '$bname'\n";
     exit 0;
