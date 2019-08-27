@@ -1,5 +1,5 @@
 # git_project
-Attempt at implementing subset of gitt
+Attempt at implementing subset of git
 
 ## Commands Available
 
